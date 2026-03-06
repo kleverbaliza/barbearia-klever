@@ -1,5 +1,6 @@
 import os
 import re
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 load_dotenv()  # carrega o arquivo .env automaticamente
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
@@ -179,7 +180,7 @@ def get_slots_bloqueados(barbeiro_id, data):
 
 def gerar_proximos_dias(quantidade=5):
     dias = []
-    data = datetime.today()
+    data = datetime.now(ZoneInfo("America/Sao_Paulo"))
     nomes = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
     while len(dias) < quantidade:
         if data.weekday() < 6:
@@ -280,7 +281,7 @@ def agendar():
         servico_sel = next((s for s in SERVICOS if s["nome"] == servico_nome), None)
         barbeiro_sel = db.session.get(Barbeiro, barbeiro_id) if barbeiro_id else None
 
-        agora = datetime.now()
+        agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
         # Valida formato de data e horário
         if not data or not re.match(r"^\d{4}-\d{2}-\d{2}$", data):
             flash("Data inválida.", "erro")
@@ -317,7 +318,7 @@ def agendar():
             flash("✅ Agendamento confirmado!", "sucesso")
             return redirect(url_for("meus_agendamentos"))
 
-    agora = datetime.now()
+    agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
     return render_template("agendar.html",
                            servicos=SERVICOS, barbeiros=barbeiros,
                            dias=dias, horarios=horarios,
