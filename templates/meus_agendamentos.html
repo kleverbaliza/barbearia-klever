@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Meus Agendamentos</h1>
+<p class="subtitle">{{ agendamentos|length }} agendamento(s) no total</p>
+
+{% if agendamentos %}
+  {% for ag in agendamentos %}
+  <div class="card" style="margin-bottom:12px;">
+    <div class="ag-item">
+      <div class="ag-info">
+        <div class="ag-servico">{{ ag.servico }}</div>
+        <div class="ag-meta">{{ ag.barbeiro.nome }} · {{ ag.data }} às {{ ag.horario }}</div>
+      </div>
+      <span class="badge badge-{{ ag.status }}">{{ ag.status }}</span>
+      <div class="ag-preco">R$ {{ ag.servico_preco }}</div>
+
+      {% if ag.status == "pendente" %}
+        <a href="{{ url_for('cancelar', ag_id=ag.id) }}"
+           class="btn btn-sm btn-danger"
+           onclick="return confirm('Cancelar este agendamento?')">Cancelar</a>
+
+      {% elif ag.status == "concluido" %}
+        {% if ag.avaliacao %}
+          <span class="avaliado">
+            {% for i in range(ag.avaliacao.estrelas) %}⭐{% endfor %}
+            Avaliado
+          </span>
+        {% else %}
+          <button class="avaliar-btn" onclick="togglePopup('popup-{{ ag.id }}')">⭐ Avaliar</button>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    {% if ag.status == "concluido" and not ag.avaliacao %}
+    <div class="star-popup" id="popup-{{ ag.id }}">
+      <span>Como foi o atendimento?</span>
+      <form method="POST" action="{{ url_for('avaliar', ag_id=ag.id) }}"
+            style="display:flex; align-items:center; gap:10px;">
+        <div class="stars-form">
+          {% for i in [5, 4, 3, 2, 1] %}
+          <input type="radio" name="estrelas" id="star-{{ ag.id }}-{{ i }}" value="{{ i }}" required>
+          <label for="star-{{ ag.id }}-{{ i }}">★</label>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-sm" style="white-space:nowrap;">Enviar</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+{% else %}
+  <div class="card" style="text-align:center; padding:40px; color:var(--text-muted);">
+    <div style="font-size:40px; margin-bottom:12px;">📋</div>
+    <p>Você ainda não tem agendamentos.</p>
+    <a href="{{ url_for('agendar') }}" class="gold" style="display:inline-block; margin-top:12px;">Agendar agora →</a>
+  </div>
+{% endif %}
+
+<script>
+function togglePopup(id) {
+  document.getElementById(id).classList.toggle('aberto');
+}
+</script>
+{% endblock %}

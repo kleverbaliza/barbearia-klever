@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Agendamento</h1>
+<p class="subtitle">Reserve seu horário — logado como <span class="gold">{{ current_user.nome }}</span></p>
+
+<form method="POST" id="form-agendamento">
+  <div class="form-grid">
+
+    <!-- COLUNA ESQUERDA: serviço -->
+    <div>
+      <div class="field">
+        <label class="field-label">Serviço</label>
+        <div class="radio-group">
+          {% for s in servicos %}
+          <label class="radio-opt">
+            <input type="radio" name="servico" value="{{ s.nome }}" data-minutos="{{ s.minutos }}">
+            <span class="opt-label">
+              {{ s.icon }} {{ s.nome }}
+              <small>({{ s.duracao }})</small>
+            </span>
+            <span class="opt-meta">R$ {{ s.preco }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUNA DIREITA: barbeiro, data, horário -->
+    <div>
+      <div class="field">
+        <label class="field-label">Barbeiro</label>
+        <div class="radio-group">
+          {% for b in barbeiros %}
+          <label class="radio-opt {% if not b.disponivel %}indisponivel{% endif %}"
+                 id="barbeiro-label-{{ b.id }}">
+            <input type="radio" name="barbeiro_id" value="{{ b.id }}"
+                   {% if not b.disponivel %}disabled{% endif %}>
+            <span class="opt-label">
+              {{ b.nome }}
+              <small>{{ b.especialidade }}</small>
+            </span>
+            <span class="opt-meta">
+              ⭐ {{ "%.1f"|format(b.nota) }}
+              <small>({{ b.avaliacoes|length }} aval.)</small>
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Data</label>
+        <div class="dias-row">
+          {% for d in dias %}
+          <label class="dia-chip">
+            <input type="radio" name="data" value="{{ d.valor }}">
+            <div class="dia-nome">{{ d.label }}</div>
+            <div class="dia-data">{{ d.exibicao }}</div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Horário</label>
+        <div class="horas-grid">
+          {% for h in horarios %}
+            {% set passado = (dias[0].valor == hoje) and (h <= hora_atual) %}
+            <label class="hora-chip {% if passado %}hora-passada{% endif %}" data-hora="{{ h }}">
+              <input type="radio" name="horario" value="{{ h }}"
+                     {% if passado %}disabled{% endif %}>
+              {{ h }}
+              {% if passado %}<span class="hora-x">✕</span>{% endif %}
+            </label>
+          {% endfor %}
+        </div>
+        <p class="horas-hint">✕ Horários indisponíveis para hoje ({{ hora_atual }})</p>
+      </div>
+
+      <button type="submit" class="btn" style="width:100%;">Confirmar Agendamento</button>
+    </div>
+
+  </div>
+</form>
+
+{# ── Script APÓS o form — garante que o DOM está pronto ─────── #}
+<script>
+(function () {
+  'use strict';
+
+  var hoje      = "{{ hoje }}";
+  var horaAtual = "{{ hora_atual }}";
+
+  /* ── Utilidade: gera slots de 30 min que um serviço ocupa ── */
+  function getSlotsServico(horarioStr, minutos) {
+    var slots  = [];
+    var partes = horarioStr.split(':');
+    var base   = new Date(2000, 0, 1, parseInt(partes[0], 10), parseInt(partes[1], 10));
+    var qtd    = Math.ceil(minutos / 30);
+    for (var i = 0; i < qtd; i++) {
+      var t = new Date(base.getTime() + i * 30 * 60000);
+      slots.push(
+        String(t.getHours()).padStart(2, '0') + ':' +
+        String(t.getMinutes()).padStart(2, '0')
+      );
+    }
+    return slots;
+  }
+
+  /* ── Revalida horários passados ao trocar de data ─────────── */
+  function atualizarPassados() {
+    var dataSel = document.querySelector('input[name="data"]:checked');
+    if (!dataSel) return;
+
+    document.querySelectorAll('.hora-chip').forEach(function (chip) {
+      var hora  = chip.dataset.hora;
+      var input = chip.querySelector('input');
+      var passou = (dataSel.value === hoje) && (hora <= horaAtual);
+
+      if (passou) {
+        chip.classList.add('hora-passada');
+        input.disabled = true;
+        input.checked  = false;
+      } else {
+        chip.classList.remove('hora-passada');
+        /* só reativa se não estiver ocupado */
+        if (!chip.classList.contains('hora-ocupada')) {
+          input.disabled = false;
+        }
+      }
+    });
+  }
+
+  /* ── Marca horários ocupados pelo barbeiro selecionado ─────── */
+  function atualizarHorariosOcupados() {
+    var dataSel     = document.querySelector('input[name="data"]:checked');
+    var barbeiroSel = document.querySelector('[id^="barbeiro-label-"] input:checked');
+    var servicoSel  = document.querySelector('input[name="servico"]:checked');
+
+    /* Remove todos os bloqueios de ocupado antes de recalcular */
+    document.querySelectorAll('.hora-chip').forEach(function (chip) {
+      if (!chip.classList.contains('hora-passada')) {
+        chip.classList.remove('hora-ocupada');
+        chip.querySelector('input').disabled = false;
+      }
+    });
+
+    if (!dataSel || !barbeiroSel) return;
+
+    var bid     = barbeiroSel.value;
+    var minutos = servicoSel ? parseInt(servicoSel.dataset.minutos || 30, 10) : 30;
+
+    fetch('/api/bloqueados?barbeiro_id=' + bid + '&data=' + dataSel.value)
+      .then(function (r) { return r.json(); })
+      .then(function (bloqueados) {
+        document.querySelectorAll('.hora-chip').forEach(function (chip) {
+          if (chip.classList.contains('hora-passada')) return;
+
+          var hora     = chip.dataset.hora;
+          var input    = chip.querySelector('input');
+          var slots    = getSlotsServico(hora, minutos);
+          /* conflito = algum slot do novo serviço já está ocupado */
+          var conflito = slots.some(function (s) {
+            return bloqueados.indexOf(s) !== -1;
+          });
+
+          if (conflito) {
+            chip.classList.add('hora-ocupada');
+            input.disabled = true;
+            input.checked  = false;
+          }
+        });
+      })
+      .catch(function (err) {
+        console.error('Erro ao buscar horários bloqueados:', err);
+      });
+  }
+
+  /* ── Marca barbeiros ocupados no horário selecionado ──────── */
+  function atualizarBarbeirosOcupados() {
+    var dataSel    = document.querySelector('input[name="data"]:checked');
+    var horarioSel = document.querySelector('input[name="horario"]:checked');
+    var servicoSel = document.querySelector('input[name="servico"]:checked');
+
+    /* Restaura barbeiros antes de recalcular */
+    document.querySelectorAll('[id^="barbeiro-label-"]').forEach(function (label) {
+      if (label.classList.contains('indisponivel')) return;
+      label.classList.remove('ocupado');
+      label.querySelector('input').disabled = false;
+    });
+
+    if (!dataSel || !horarioSel) return;
+
+    var minutos = servicoSel ? parseInt(servicoSel.dataset.minutos || 30, 10) : 30;
+
+    /* Uma única chamada ao invés de N chamadas paralelas */
+    fetch('/api/ocupados_duracao?data=' + dataSel.value +
+          '&horario=' + horarioSel.value +
+          '&minutos=' + minutos)
+      .then(function (r) { return r.json(); })
+      .then(function (ocupados) {
+        document.querySelectorAll('[id^="barbeiro-label-"]').forEach(function (label) {
+          if (label.classList.contains('indisponivel')) return;
+          var bid   = parseInt(label.id.replace('barbeiro-label-', ''), 10);
+          var input = label.querySelector('input');
+
+          if (ocupados.indexOf(bid) !== -1) {
+            label.classList.add('ocupado');
+            input.disabled = true;
+            input.checked  = false;
+          }
+        });
+      })
+      .catch(function (err) {
+        console.error('Erro ao buscar barbeiros ocupados:', err);
+      });
+  }
+
+  /* ── Event listeners ──────────────────────────────────────── */
+
+  /* Ao mudar data → revalida passados, horários e barbeiros */
+  document.querySelectorAll('input[name="data"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      atualizarPassados();
+      atualizarHorariosOcupados();
+      atualizarBarbeirosOcupados();
+    });
+  });
+
+  /* Ao clicar num horário → revalida barbeiros */
+  document.querySelectorAll('.hora-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      setTimeout(atualizarBarbeirosOcupados, 80);
+    });
+  });
+
+  /* Ao mudar serviço → revalida horários e barbeiros */
+  document.querySelectorAll('input[name="servico"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      atualizarHorariosOcupados();
+      atualizarBarbeirosOcupados();
+    });
+  });
+
+  /* Ao mudar barbeiro → revalida horários ocupados */
+  document.querySelectorAll('[id^="barbeiro-label-"] input').forEach(function (r) {
+    r.addEventListener('change', function () {
+      setTimeout(atualizarHorariosOcupados, 80);
+    });
+  });
+
+})();
+</script>
+{% endblock %}

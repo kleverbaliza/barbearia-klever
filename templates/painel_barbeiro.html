@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="barbeiro-header">
+  {% if barbeiro.foto %}
+  <img src="{{ barbeiro.foto }}" alt="{{ barbeiro.nome }}" class="barbeiro-foto">
+  {% endif %}
+  <div>
+    <h1>{{ barbeiro.nome }}</h1>
+    <p class="barbeiro-especialidade">{{ barbeiro.especialidade }}</p>
+  </div>
+</div>
+
+<div class="status-row">
+  <span class="status-badge {% if barbeiro.disponivel %}status-disponivel{% else %}status-indisponivel{% endif %}">
+    <span class="dot {% if barbeiro.disponivel %}dot-verde{% else %}dot-cinza{% endif %}"></span>
+    {% if barbeiro.disponivel %}Disponível para atendimento{% else %}Indisponível no momento{% endif %}
+  </span>
+  <a href="{{ url_for('toggle_disponibilidade') }}"
+     class="toggle-btn {% if barbeiro.disponivel %}toggle-disponivel{% else %}toggle-indisponivel{% endif %}">
+    {% if barbeiro.disponivel %}⏸️ Pausar atendimento{% else %}▶️ Retomar atendimento{% endif %}
+  </a>
+</div>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-num">{{ pendentes|length }}</div>
+    <div class="stat-label">Na fila</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">R$&nbsp;{{ total }}</div>
+    <div class="stat-label">Faturado</div>
+  </div>
+</div>
+
+<h2>Sua Fila</h2>
+
+{% if pendentes %}
+  {% for ag in pendentes %}
+  <div class="queue-item">
+    <div class="q-pos">#{{ loop.index }}</div>
+    <div class="queue-info">
+      <div class="queue-nome">{{ ag.usuario.nome }}</div>
+      <div class="queue-meta">{{ ag.servico }}</div>
+      <div class="queue-data">{{ ag.data }} às {{ ag.horario }}</div>
+    </div>
+    <div class="queue-preco">R$ {{ ag.servico_preco }}</div>
+    <div class="actions">
+      <a href="{{ url_for('barbeiro_concluir', ag_id=ag.id) }}" class="btn btn-sm btn-green">✓ Concluído</a>
+      <a href="{{ url_for('barbeiro_cancelar', ag_id=ag.id) }}" class="btn btn-sm btn-danger"
+         onclick="return confirm('Cancelar agendamento de {{ ag.usuario.nome }}?')">✕</a>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card" style="text-align:center; padding:40px; color:var(--text-muted);">
+    <div style="font-size:40px; margin-bottom:12px;">🎉</div>
+    <p>Nenhum cliente na fila no momento.</p>
+  </div>
+{% endif %}
+{% endblock %}

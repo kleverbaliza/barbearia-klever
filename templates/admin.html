@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>⚡ Painel Admin</h1>
+<p class="subtitle">Visão geral da barbearia</p>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-num">{{ pendentes|length }}</div>
+    <div class="stat-label">Pendentes</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ barbeiros|length }}</div>
+    <div class="stat-label">Barbeiros</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">R$&nbsp;{{ total }}</div>
+    <div class="stat-label">Faturado</div>
+  </div>
+</div>
+
+<h2>Barbeiros</h2>
+
+<form method="POST" action="{{ url_for('admin_novo_barbeiro') }}">
+  <div class="form-inline">
+    <input type="text"  name="nome"          placeholder="Nome do barbeiro" required>
+    <input type="email" name="email"         placeholder="E-mail Google"   required>
+    <input type="text"  name="especialidade" placeholder="Especialidade">
+    <button type="submit" class="btn" style="white-space:nowrap;">+ Adicionar</button>
+  </div>
+</form>
+
+<div class="barbers-grid">
+  {% for b in barbeiros %}
+  <div class="barber-card {% if b.disponivel %}disponivel{% endif %}">
+    <div class="barber-header">
+      {% if b.foto %}
+        <img src="{{ b.foto }}" alt="{{ b.nome }}" class="barber-avatar">
+      {% else %}
+        <div class="barber-avatar-placeholder">{{ b.nome[0] }}</div>
+      {% endif %}
+      <div>
+        <div class="barber-nome">{{ b.nome }}</div>
+        <div class="barber-espec">{{ b.especialidade }}</div>
+      </div>
+    </div>
+    <div class="barber-status">
+      <span class="avail-dot" style="background:{% if b.disponivel %}#4caf50{% else %}#888{% endif %};"></span>
+      {% if b.disponivel %}Disponível{% else %}Indisponível{% endif %}
+      <span class="barber-email">{{ b.email }}</span>
+    </div>
+    <a href="{{ url_for('admin_remover_barbeiro', b_id=b.id) }}"
+       class="btn btn-sm btn-danger"
+       onclick="return confirm('Remover {{ b.nome }}?')">Remover</a>
+  </div>
+  {% else %}
+  <p style="color:var(--text-muted);">Nenhum barbeiro cadastrado ainda.</p>
+  {% endfor %}
+</div>
+
+<h2><span class="live-dot"></span>Fila Geral</h2>
+
+{% if pendentes %}
+  {% for ag in pendentes %}
+  <div class="queue-item">
+    <div class="q-pos">#{{ loop.index }}</div>
+    <div class="queue-info">
+      <div class="queue-nome">{{ ag.usuario.nome }}</div>
+      <div class="queue-meta">{{ ag.servico }} · {{ ag.barbeiro.nome }}</div>
+      <div class="queue-data">{{ ag.data }} às {{ ag.horario }}</div>
+    </div>
+    <div class="queue-preco">R$ {{ ag.servico_preco }}</div>
+    <div class="actions">
+      <a href="{{ url_for('admin_concluir', ag_id=ag.id) }}" class="btn btn-sm btn-green">✓ Concluído</a>
+      <a href="{{ url_for('admin_cancelar', ag_id=ag.id) }}" class="btn btn-sm btn-danger"
+         onclick="return confirm('Cancelar?')">✕</a>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card" style="text-align:center; padding:40px; color:var(--text-muted);">
+    <div style="font-size:40px; margin-bottom:12px;">🎉</div>
+    <p>Nenhum agendamento pendente.</p>
+  </div>
+{% endif %}
+{% endblock %}

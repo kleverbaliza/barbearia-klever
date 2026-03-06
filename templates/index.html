@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="hero">
+  <h1>Olá, <span class="gold">{{ current_user.nome.split()[0] }}</span> 👋</h1>
+  <p class="subtitle">Bem-vindo à Barbearia Klever. O que vamos fazer hoje?</p>
+  <a href="{{ url_for('agendar') }}" class="btn">Agendar Horário</a>
+</div>
+
+<hr class="divider">
+
+<h2>Nossos Serviços</h2>
+<p class="subtitle">{{ servicos|length }} serviços disponíveis</p>
+
+<div class="services-grid">
+  {% for s in servicos %}
+  <div class="service-card">
+    <div class="service-icon">{{ s.icon }}</div>
+    <div class="service-name">{{ s.nome }}</div>
+    <div class="service-meta">
+      <span class="service-duration">{{ s.duracao }}</span>
+      <span class="service-price">R$ {{ s.preco }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
