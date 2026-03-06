@@ -10,6 +10,9 @@
 </head>
 <body>
 <nav>
+</head>
+<body>
+<nav>
   <div class="logo">✦ BARBEARIA <span>KLEVER</span></div>
   {% if current_user.is_authenticated %}
   <div class="nav-links">
@@ -42,5 +45,6 @@
   {% endwith %}
   {% block content %}{% endblock %}
 </div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
